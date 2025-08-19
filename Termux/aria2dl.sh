@@ -1,6 +1,5 @@
 #!/usr/bin/bash
 
-<<comment
 # --- Downloading latest aria2dl.sh file from GitHub ---
 curl -o "$HOME/.aria2dl.sh" "https://raw.githubusercontent.com/arghya339/aria2dl/refs/heads/main/Termux/aria2dl.sh" > /dev/null 2>&1
 
@@ -8,7 +7,6 @@ if [ ! -f "$PREFIX/bin/aria2dl" ]; then
   ln -s $HOME/.aria2dl.sh $PREFIX/bin/aria2dl  # symlink (shortcut of aria2dl.sh)
 fi
 chmod +x $HOME/.aria2dl.sh  # give execute permission to aria2dl
-comment
 
 # --- Colored log indicators ---
 good="\033[92;1m[✔]\033[0m"
