@@ -235,15 +235,15 @@ apkInstall() {
      else
       su -c "pm install -i com.android.vending '/data/local/tmp/$fileName'"
     fi
-    su -c "rm '/data/local/tmp/$fileName'"
+    su -c "rm -f '/data/local/tmp/$fileName'"
   elif "$HOME/rish" -c "id" >/dev/null 2>&1; then
     ~/rish -c "cp '$output_path' '/data/local/tmp/$fileName'"
     ./rish -c "pm install -r -i com.android.vending '/data/local/tmp/$fileName'" > /dev/null 2>&1  # -r=reinstall --force-uplow=downgrade
-    $HOME/rish -c "rm '/data/local/tmp/$fileName'"
+    $HOME/rish -c "rm -f '/data/local/tmp/$fileName'"
   elif [ $Android -le 7 ]; then
-    termux-open "$output_path"  # open file in pm
-  else
     am start -a android.intent.action.VIEW -t application/vnd.android.package-archive -d "file://${output_path}"
+  else
+    termux-open --view "$output_path"  # open file in pm
   fi
 }
 
