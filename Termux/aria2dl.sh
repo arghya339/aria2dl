@@ -140,7 +140,9 @@ while true; do
   read -p "Enter download Url: " dlUrl
   Referer=$(echo "$dlUrl" | awk -F/ '{print $1"//"$3"/"}')  # extract base domain from dlUrl
   http_status=$(curl -sL --head --silent --fail --doh-url "$cfDOH" -A "$UA" -H "Referer: $Referer" "$dlUrl" 2>/dev/null)  # Check HTTP status code
-  if [ "$http_status" != "404" ] || [ "$http_status" == "302" ] || [ "$http_status" == "200" ] || [ "$http_status" == "403" ]; then
+  if [[ "$dlUrl" =~ ^[Qq] ]]; then
+    exit 0
+  elif [ "$http_status" != "404" ] || [ "$http_status" == "302" ] || [ "$http_status" == "200" ] || [ "$http_status" == "403" ]; then
     echo && break
   else
     echo -e "$notice Given Url invalid! Please enter a valid Url." && sleep 3 && clear
