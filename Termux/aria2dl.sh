@@ -51,20 +51,50 @@ print_aria2dl() {
   printf '\n'
 }
 
-# --- Storage Permission Check Logic ---
-if [ ! -d "$HOME/storage/shared" ]; then
-    # Attempt to list /storage/emulated/0 to trigger the error
-    error=$(ls /storage/emulated/0 2>&1)
-    expected_error="ls: cannot open directory '/storage/emulated/0': Permission denied"
+Android=$(getprop ro.build.version.release | cut -d. -f1)  # Get major Android version
 
-    if echo "$error" | grep -qF "$expected_error" || ! echo "$error" | grep -q "^Android"; then
-        echo -e "${notice} Storage permission not granted. Running ${Green}termux-setup-storage${Reset}.."
-        termux-setup-storage
-        exit 1  # Exit the script after handling the error
-    else
-        echo -e "${bad} Unknown error: ${Red}$error${Reset}"
-        exit 1  # Exit on any other error
+# --- Storage Permission Check Logic ---
+if ! ls /sdcard/ 2>/dev/null | grep -E -q "^(Android|Download)"; then
+  echo -e "${notice} ${Yellow}Storage permission not granted!${Reset}\n$running ${Green}termux-setup-storage${Reset}.."
+  if [ "$Android" -gt 5 ]; then  # for Android 5 storage permissions grant during app installation time, so Termux API termux-setup-storage command not required
+    count=0
+    while true; do
+      if [ "$count" -ge 2 ]; then
+        echo -e "$bad Failed to get storage permissions after $count attempts!"
+        echo -e "$notice Please grant permissions manually in Termux App info > Permissions > Files > File permission → Allow."
+        am start -a android.settings.APPLICATION_DETAILS_SETTINGS -d package:com.termux &> /dev/null
+        exit 0
+      fi
+      termux-setup-storage  # ask Termux Storage permissions
+      sleep 3  # wait 3 seconds
+      if ls /sdcard/ 2>/dev/null | grep -q "^Android" || ls "$HOME/storage/shared/" 2>/dev/null | grep -q "^Android"; then
+        break
+        if [ "$Android" -lt 8 ]; then
+          exit 0  # Exit the script
+        fi
+      fi
+      ((count++))
+    done
+  fi
+fi
+
+# --- enabled allow-external-apps ---
+if [ "$Android" -eq 6 ] && [ ! -f "$HOME/.termux/termux.properties" ]; then
+  mkdir -p "$HOME/.termux" && echo "allow-external-apps = true" > "$HOME/.termux/termux.properties"
+  echo -e "$notice 'termux.properties' file has been created successfully & 'allow-external-apps = true' line has been add (enabled) in Termux \$HOME/.termux/termux.properties."
+  termux-reload-settings
+fi
+if [ "$Android" -ge 6 ]; then
+  if grep -q "^# allow-external-apps" "$HOME/.termux/termux.properties"; then
+    # other Android applications can send commands into Termux.
+    # termux-open utility can send an Android Intent from Termux to Android system to open apk package file in pm.
+    # other Android applications also can be Access Termux app data (files).
+    sed -i '/allow-external-apps/s/# //' "$HOME/.termux/termux.properties"  # uncomment 'allow-external-apps = true' line
+    echo -e "$notice 'allow-external-apps = true' line has been uncommented (enabled) in Termux \$HOME/.termux/termux.properties."
+    if [ "$Android" -eq 6 ]; then
+      termux-reload-settings  # reload (restart) Termux settings required for Android 6 after enabled allow-external-apps
     fi
+  fi
 fi
 
 # --- Checking Internet Connection ---
@@ -83,7 +113,6 @@ dl_dir="/sdcard/Download"  # Download dir
 outdatedPKG=$(apt list --upgradable 2>/dev/null)  # get list of Termux outdated pkg
 installedPKG=$(pkg list-installed 2>/dev/null)  # get list of Termux installed pkg
 mkdir -p "$dl_dir"  # create $dl_dir if it doesn't exist
-Android=$(getprop ro.build.version.release | cut -d. -f1)  # Get major Android version
 apMode=$(getprop persist.radio.airplane_mode_on)  # Get AirPlane Mode Status (0=OFF; 1=ON)
 networkType1=$(getprop gsm.network.type | cut -d',' -f1)  # Get SIM1 Network type (NR_SA/NR_NSA,LTE)
 networkType2=$(getprop gsm.network.type | cut -d',' -f2)  # Get SIM2 Network type (NR_SA/NR_NSA,LTE)
@@ -119,18 +148,31 @@ pkgInstall "bsdtar"  # bsdtar install/update
 pkgInstall "pv"  # pv install/update
 
 # --- Shizuku Setup first time ---
-if [ ! -f "$HOME/rish" ] || [ ! -f "$HOME/rish_shizuku.dex" ]; then
-  termux-open-url "https://play.google.com/store/apps/details?id=moe.shizuku.privileged.api"
+if ! su -c "id" >/dev/null 2>&1 && { [ ! -f "$HOME/rish" ] || [ ! -f "$HOME/rish_shizuku.dex" ]; }; then
+  #echo -e "$info Please manually install Shizuku from Google Play Store." && sleep 1
+  #termux-open-url "https://play.google.com/store/apps/details?id=moe.shizuku.privileged.api"
+  echo -e "$info Please manually install Shizuku from GitHub." && sleep 1
+  termux-open-url "https://github.com/RikkaApps/Shizuku/releases/latest"
+  am start -n com.android.settings/.Settings\$MyDeviceInfoActivity > /dev/null 2>&1  # Open Device Info
+
   curl -sL -o "$HOME/rish" "https://raw.githubusercontent.com/arghya339/crdl/refs/heads/main/Termux/Shizuku/rish" && chmod +x "$HOME/rish"
   sleep 0.5 && curl -sL -o "$HOME/rish_shizuku.dex" "https://raw.githubusercontent.com/arghya339/crdl/refs/heads/main/Termux/Shizuku/rish_shizuku.dex"
-  if [ $Android -le 10 ]; then
-    am start -n com.android.settings/.Settings\$DevelopmentSettingsDashboardActivity > /dev/null 2>&1  # Open Developer options
-    termux-open-url "https://youtu.be/ZxjelegpTLA"  # YouTube/@MrPalash360: Start Shizuku using Computer
+  
+  if [ "$Android" -lt 11 ]; then
+    url="https://youtu.be/ZxjelegpTLA"  # YouTube/@MrPalash360: Start Shizuku using Computer
+    activityClass="com.android.settings/.Settings\$DevelopmentSettingsDashboardActivity"  # Open Developer options
   else
-    am start -n com.android.settings/.Settings\$WirelessDebuggingActivity > /dev/null 2>&1  # Open Wireless Debugging Settings
-    termux-open-url "https://youtu.be/YRd0FBfdntQ"  # YouTube/@MrPalash360: Start Shizuku Android 11+
+    activityClass="com.android.settings/.Settings\$WirelessDebuggingActivity"  # Open Wireless Debugging Settings
+    url="https://youtu.be/YRd0FBfdntQ"  # YouTube/@MrPalash360: Start Shizuku Android 11+
   fi
-  exit 1
+  echo -e "$info Please start Shizuku by following guide: $url" && sleep 1
+  am start -n "$activityClass" > /dev/null 2>&1
+  termux-open-url "$url"
+fi
+if ! "$HOME/rish" -c "id" >/dev/null 2>&1 && [ -f "$HOME/rish_shizuku.dex" ]; then
+  if ~/rish -c "id" 2>&1 | grep -q 'java.lang.UnsatisfiedLinkError'; then
+    rm -f "$HOME/rish_shizuku.dex" && curl -sL -o "$HOME/rish_shizuku.dex" "https://raw.githubusercontent.com/arghya339/crdl/refs/heads/main/Termux/Shizuku/Play/rish_shizuku.dex"
+  fi
 fi
 
 # --- prompt user to enter download url ---
@@ -169,6 +211,7 @@ if [[ $dlUrl == *"archive"* ]]; then
       rm -rf "$fileName"
       rm -rf "$fileName.aria2"
       direct_url=$(grep -o 'URI=https://rd[0-9]*\.seedr\.cc/[^ ]*' aria2dl_log.txt | head -1 | sed 's/URI=//')
+      dlUrl="$direct_url"
       rm -f aria2dl_log.txt
       encoded_fileName=$(echo "$direct_url" | sed 's/.*\///; s/?.*//')  # Extract everything after last / and before ?
       decoded_fileName=$(echo "$encoded_fileName" | sed 's/%20/ /g')  # replace %20 with space
@@ -242,7 +285,7 @@ apkInstall() {
     ~/rish -c "cp '$output_path' '/data/local/tmp/$fileName'"
     ./rish -c "pm install -r -i com.android.vending '/data/local/tmp/$fileName'" > /dev/null 2>&1  # -r=reinstall --force-uplow=downgrade
     $HOME/rish -c "rm -f '/data/local/tmp/$fileName'"
-  elif [ $Android -le 7 ]; then
+  elif [ $Android -le 6 ]; then
     am start -a android.intent.action.VIEW -t application/vnd.android.package-archive -d "file://${output_path}"
   else
     termux-open --view "$output_path"  # open file in pm
