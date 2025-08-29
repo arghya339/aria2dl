@@ -314,7 +314,7 @@ prompt() {
         else
           termux-open --send "$output_path"  # open & share dl file
         fi
-        if [ $isOverwriteTermuxProp -eq 1 ]; then sed -i '/allow-external-apps/s/^/# /' "$HOME/.termux/termux.properties";fi && break
+        sleep 3 && break
         ;;
       n*|N*)
         echo -e "$notice Download cancel by user!"
