@@ -187,7 +187,7 @@ getFileMetadata() {
     fileName=$(echo "$dlUrl" | awk -F'/' '{print $6}' | sed 's/%20/ /g; s/?.*//')  # seedr.cc dlUrl pattern
   fi
   # If File Has an Extension Extract it
-  if [[ $dlUrl == *"archive"* ]]; then
+  if [[ "$dlUrl" == *"archive"* ]]; then
     while true; do
       > aria2dl_log.txt  # Clear previous log
       aria2c -x 16 -s 16 --continue=true --console-log-level=error --download-result=hide --summary-interval=0 -d "$HOME" -o "$fileName" -U "User-Agent: $UA" -U "Referer: $referUrl" --async-dns=true --async-dns-server="$cfIP" "$dlUrl" >> aria2dl_log.txt 2>&1 &
