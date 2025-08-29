@@ -178,43 +178,43 @@ if ! "$HOME/rish" -c "id" >/dev/null 2>&1 && [ -f "$HOME/rish_shizuku.dex" ]; th
   fi
 fi
 
-# --- Variables ----
-Referer=$(echo "$dlUrl" | awk -F/ '{print $1"//"$3"/"}')  # extract base domain from dlUrl
-fileName=$(curl -sIL --doh-url "$cfDOH" -A "$UA" -H "Referer: $Referer" "$dlUrl" | grep -i '^location:\|content-disposition' | sed -n 's/.*filename=//p' | tail -1 | tr -d '\r"' | sed 's/.*\///')  # get fileName from dlUrl using curl
-fileSize=$(curl -sIL $dlUrl 2>/dev/null | grep -i Content-Length | tail -n 1 | awk '{ printf "Content Size: %.2f MB\n", $2 / 1024 / 1024 }' 2>/dev/null)  # dl file size
-if [ -z "$fileName" ]; then
-  fileName=$(echo "$dlUrl" | awk -F'/' '{print $6}' | sed 's/%20/ /g; s/?.*//')  # seedr.cc dlUrl pattern
-fi
-# If File Has an Extension Extract it
-if [[ $dlUrl == *"archive"* ]]; then
-  while true; do
-    > aria2dl_log.txt  # Clear previous log
-    aria2c -x 16 -s 16 --continue=true --console-log-level=error --download-result=hide --summary-interval=0 -d "$HOME" -o "$fileName" -U "User-Agent: $UA" -U "Referer: $referUrl" --async-dns=true --async-dns-server="$cfIP" "$dlUrl" >> aria2dl_log.txt 2>&1 &
-    aria2ProcessId=$!
-    sleep 3  # Wait a moment for the log file to start being written
-    if grep -q "[0-9]*%" aria2dl_log.txt; then
-      kill $aria2ProcessId 2>/dev/null  # Stop aria2c process
-      wait $aria2ProcessId 2>/dev/null  # Wait for it to terminate
-      rm -rf "$fileName"
-      rm -rf "$fileName.aria2"
-      direct_url=$(grep -o 'URI=https://rd[0-9]*\.seedr\.cc/[^ ]*' aria2dl_log.txt | head -1 | sed 's/URI=//')
-      dlUrl="$direct_url"
-      rm -f aria2dl_log.txt
-      encoded_fileName=$(echo "$direct_url" | sed 's/.*\///; s/?.*//')  # Extract everything after last / and before ?
-      decoded_fileName=$(echo "$encoded_fileName" | sed 's/%20/ /g')  # replace %20 with space
-      decoded_fileSize=$(echo "$encoded_fileName" | sed 's/%20/ /g' | awk -F' - ' '{print $NF}' | sed 's/\.[^.]*$//')  # Extract after last - and before .
-      [ -z "$fileSize" ] && fileSize="$decoded_fileSize"
-      break
-    fi
-  done
-  fileName="$decoded_fileName"
-  file_ext="zip"
-elif [[ "$fileName" == *.* ]]; then
-  file_ext="${fileName##*.}"
-fi
-output_path="$dl_dir/$fileName"  # save location of downloaded file
-
-
+# --- Get File Metadata ----
+getFileMetadata() {
+  Referer=$(echo "$dlUrl" | awk -F/ '{print $1"//"$3"/"}')  # extract base domain from dlUrl
+  fileName=$(curl -sIL --doh-url "$cfDOH" -A "$UA" -H "Referer: $Referer" "$dlUrl" | grep -i '^location:\|content-disposition' | sed -n 's/.*filename=//p' | tail -1 | tr -d '\r"' | sed 's/.*\///')  # get fileName from dlUrl using curl
+  fileSize=$(curl -sIL $dlUrl 2>/dev/null | grep -i Content-Length | tail -n 1 | awk '{ printf "Content Size: %.2f MB\n", $2 / 1024 / 1024 }' 2>/dev/null)  # dl file size
+  if [ -z "$fileName" ]; then
+    fileName=$(echo "$dlUrl" | awk -F'/' '{print $6}' | sed 's/%20/ /g; s/?.*//')  # seedr.cc dlUrl pattern
+  fi
+  # If File Has an Extension Extract it
+  if [[ $dlUrl == *"archive"* ]]; then
+    while true; do
+      > aria2dl_log.txt  # Clear previous log
+      aria2c -x 16 -s 16 --continue=true --console-log-level=error --download-result=hide --summary-interval=0 -d "$HOME" -o "$fileName" -U "User-Agent: $UA" -U "Referer: $referUrl" --async-dns=true --async-dns-server="$cfIP" "$dlUrl" >> aria2dl_log.txt 2>&1 &
+      aria2ProcessId=$!
+      sleep 3  # Wait a moment for the log file to start being written
+      if grep -q "[0-9]*%" aria2dl_log.txt; then
+        kill $aria2ProcessId 2>/dev/null  # Stop aria2c process
+        wait $aria2ProcessId 2>/dev/null  # Wait for it to terminate
+        rm -rf "$fileName"
+        rm -rf "$fileName.aria2"
+        direct_url=$(grep -o 'URI=https://rd[0-9]*\.seedr\.cc/[^ ]*' aria2dl_log.txt | head -1 | sed 's/URI=//')
+        dlUrl="$direct_url"
+        rm -f aria2dl_log.txt
+        encoded_fileName=$(echo "$direct_url" | sed 's/.*\///; s/?.*//')  # Extract everything after last / and before ?
+        decoded_fileName=$(echo "$encoded_fileName" | sed 's/%20/ /g')  # replace %20 with space
+        decoded_fileSize=$(echo "$encoded_fileName" | sed 's/%20/ /g' | awk -F' - ' '{print $NF}' | sed 's/\.[^.]*$//')  # Extract after last - and before .
+        [ -z "$fileSize" ] && fileSize="$decoded_fileSize"
+        break
+      fi
+    done
+    fileName="$decoded_fileName"
+    file_ext="zip"
+  elif [[ "$fileName" == *.* ]]; then
+    file_ext="${fileName##*.}"
+  fi
+  output_path="$dl_dir/$fileName"  # save location of downloaded file
+}
 
 # for aria2 due to this cl tool doesn't support --console-log-level=hide flag
 aria2ConsoleLogHide() {
@@ -340,6 +340,7 @@ while true; do
       echo -e "$notice Given Url invalid! Please enter a valid Url." && sleep 3 && clear
     fi
   done
+  getFileMetadata  # Call the get file metadata function
   prompt  # Call the prompt function
   continue
 done
