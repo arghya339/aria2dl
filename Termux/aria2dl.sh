@@ -196,8 +196,8 @@ getFileMetadata() {
       if grep -q "[0-9]*%" aria2dl_log.txt; then
         kill $aria2ProcessId 2>/dev/null  # Stop aria2c process
         wait $aria2ProcessId 2>/dev/null  # Wait for it to terminate
-        rm -rf "$fileName"
-        rm -rf "$fileName.aria2"
+        rm -rf "$HOME/$fileName"
+        rm -rf "$HOME/${fileName}.aria2"
         direct_url=$(grep -o 'URI=https://rd[0-9]*\.seedr\.cc/[^ ]*' aria2dl_log.txt | head -1 | sed 's/URI=//')
         dlUrl="$direct_url"
         rm -f aria2dl_log.txt
