@@ -198,7 +198,7 @@ getFileMetadata() {
         wait $aria2ProcessId 2>/dev/null  # Wait for it to terminate
         rm -rf "$HOME/$fileName"
         rm -rf "$HOME/${fileName}.aria2"
-        direct_url=$(grep -o 'URI=https://rd[0-9]*\.seedr\.cc/[^ ]*' aria2dl_log.txt | head -1 | sed 's/URI=//')
+        direct_url=$(grep -o 'URI=https://[^ ]*\.seedr\.cc/[^ ]*' aria2dl_log.txt | head -1 | sed 's/URI=//')
         dlUrl="$direct_url"
         rm -f aria2dl_log.txt
         encoded_fileName=$(echo "$direct_url" | sed 's/.*\///; s/?.*//')  # Extract everything after last / and before ?
