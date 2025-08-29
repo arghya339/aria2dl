@@ -178,22 +178,6 @@ if ! "$HOME/rish" -c "id" >/dev/null 2>&1 && [ -f "$HOME/rish_shizuku.dex" ]; th
   fi
 fi
 
-# --- prompt user to enter download url ---
-while true; do
-  clear
-  print_aria2dl  # Call the print aria2dl shape function
-  read -p "Enter download Url: " dlUrl
-  Referer=$(echo "$dlUrl" | awk -F/ '{print $1"//"$3"/"}')  # extract base domain from dlUrl
-  http_status=$(curl -sL --head --silent --fail --doh-url "$cfDOH" -A "$UA" -H "Referer: $Referer" "$dlUrl" 2>/dev/null)  # Check HTTP status code
-  if [[ "$dlUrl" =~ ^[Qq] ]]; then
-    if [ $isOverwriteTermuxProp -eq 1 ]; then sed -i '/allow-external-apps/s/^/# /' "$HOME/.termux/termux.properties";fi && clear && exit 0
-  elif [ "$http_status" != "404" ] || [ "$http_status" == "302" ] || [ "$http_status" == "200" ] || [ "$http_status" == "403" ]; then
-    echo && break
-  else
-    echo -e "$notice Given Url invalid! Please enter a valid Url." && sleep 3 && clear
-  fi
-done
-
 # --- Variables ----
 Referer=$(echo "$dlUrl" | awk -F/ '{print $1"//"$3"/"}')  # extract base domain from dlUrl
 fileName=$(curl -sIL --doh-url "$cfDOH" -A "$UA" -H "Referer: $Referer" "$dlUrl" | grep -i '^location:\|content-disposition' | sed -n 's/.*filename=//p' | tail -1 | tr -d '\r"' | sed 's/.*\///')  # get fileName from dlUrl using curl
@@ -296,48 +280,67 @@ apkInstall() {
 }
 
 # --- ask the user if they want to download ---
+prompt() {
+  while true; do
+    echo -e "[?] Do you want to download ${Red}$fileName${Reset} - $fileSize [Y/n]: \c" && read opt
+    case $opt in
+      y*|Y*|"")
+        dl  # Call the download function
+        if [ "$file_ext" == "apk" ]; then
+          echo -e "Do you want to install ${Red}$fileName${Reset} [Y/n]: \c" && read options
+          case $options in
+            y*|Y*|"")
+              apkInstall  # Call the apk Install function
+              ;;
+            n*|N*) echo -e "$notice ${Red}$fileName${Reset} installation skiped by user!" ;;
+            *) echo -e "$info Invalid choice! installation skiped!" ;;
+          esac
+        elif [ "$file_ext" == "zip" ]; then
+          echo -e "Do you want to extract archive ${Red}$fileName${Reset} [Y/n]: \c" && read options
+          case $options in
+            y*|Y*|"")
+              #base_name="${fileName%.*}"
+              #mkdir -p "$dl_dir/$base_name"
+              pv "$output_path" | bsdtar -xf - -C "$dl_dir/"
+              rm -f "$dl_dir/$base_name"
+              ;;
+            n*|N*) echo -e "$notice ${Red}$fileName${Reset} archive extracting skiped by user!" ;;
+            *) echo -e "$info Invalid choice! archive extracting skiped!"
+          esac
+        elif [ "$file_ext" == "iso" ]; then
+          am start -n "eu.depau.etchdroid/.ui.MainActivity" >/dev/null 2>&1
+          [ $? != 0 ] && termux-open-url "https://github.com/etchdroid/etchdroid/releases"
+        else
+          termux-open --send "$output_path"  # open & share dl file
+        fi
+        if [ $isOverwriteTermuxProp -eq 1 ]; then sed -i '/allow-external-apps/s/^/# /' "$HOME/.termux/termux.properties";fi && break
+        ;;
+      n*|N*)
+        echo -e "$notice Download cancel by user!"
+        break  # break the while loop
+        ;;
+      *) echo -e "$info Invalid choice! Please select valid options." && sleep 3 ;;
+    esac
+  done
+}
+
+# --- prompt user to enter download url ---
 while true; do
-  echo -e "[?] Do you want to download ${Red}$fileName${Reset} - $fileSize [Y/n]: \c" && read opt
-  case $opt in
-    y*|Y*|"")
-      dl  # Call the download function
-      if [ "$file_ext" == "apk" ]; then
-        echo -e "Do you want to install ${Red}$fileName${Reset} [Y/n]: \c" && read options
-        case $options in
-          y*|Y*|"")
-            apkInstall  # Call the apk Install function
-            ;;
-          n*|N*) 
-            echo -e "$notice ${Red}$fileName${Reset} installation skiped by user!"
-            ;;
-          *) echo -e "$info Invalid choice! installation skiped!"
-        esac
-      elif [ "$file_ext" == "zip" ]; then
-        echo -e "Do you want to extract archive ${Red}$fileName${Reset} [Y/n]: \c" && read options
-        case $options in
-          y*|Y*|"")
-            #base_name="${fileName%.*}"
-            #mkdir -p "$dl_dir/$base_name"
-            pv "$output_path" | bsdtar -xf - -C "$dl_dir/"
-            rm -f "$dl_dir/$base_name"
-            ;;
-            n*|N*) 
-            echo -e "$notice ${Red}$fileName${Reset} archive extracting skiped by user!"
-            ;;
-          *) echo -e "$info Invalid choice! archive extracting skiped!"
-        esac
-      elif [ "$file_ext" == "iso" ]; then
-        am start -n "eu.depau.etchdroid/.ui.MainActivity" >/dev/null 2>&1
-        [ $? != 0 ] && termux-open-url "https://github.com/etchdroid/etchdroid/releases"
-      else
-        termux-open --send "$output_path"  # open & share dl file
-      fi
-      if [ $isOverwriteTermuxProp -eq 1 ]; then sed -i '/allow-external-apps/s/^/# /' "$HOME/.termux/termux.properties";fi && break
-      ;;
-    n*|N*)
-      echo -e "$notice Download cancel by user!"
-      ;;
-    *) echo -e "$info Invalid choice! Please select valid options." && sleep 3 ;;
-  esac
+  clear
+  print_aria2dl  # Call the print aria2dl shape function
+  read -p "Enter download Url: " dlUrl
+  Referer=$(echo "$dlUrl" | awk -F/ '{print $1"//"$3"/"}')  # extract base domain from dlUrl
+  http_status=$(curl -sL --head --silent --fail --doh-url "$cfDOH" -A "$UA" -H "Referer: $Referer" "$dlUrl" 2>/dev/null)  # Check HTTP status code
+  while true; do
+    if [[ "$dlUrl" =~ ^[Qq] ]]; then
+      if [ $isOverwriteTermuxProp -eq 1 ]; then sed -i '/allow-external-apps/s/^/# /' "$HOME/.termux/termux.properties";fi && clear && exit 0
+    elif [ "$http_status" != "404" ] || [ "$http_status" == "302" ] || [ "$http_status" == "200" ] || [ "$http_status" == "403" ]; then
+      echo && break
+    else
+      echo -e "$notice Given Url invalid! Please enter a valid Url." && sleep 3 && clear
+    fi
+  done
+  prompt  # Call the prompt function
+  continue
 done
 #################################################################################
