@@ -79,8 +79,10 @@ if ! ls /sdcard/ 2>/dev/null | grep -E -q "^(Android|Download)"; then
 fi
 
 # --- enabled allow-external-apps ---
+isOverwriteTermuxProp=0
 if [ "$Android" -eq 6 ] && [ ! -f "$HOME/.termux/termux.properties" ]; then
   mkdir -p "$HOME/.termux" && echo "allow-external-apps = true" > "$HOME/.termux/termux.properties"
+  isOverwriteTermuxProp=1
   echo -e "$notice 'termux.properties' file has been created successfully & 'allow-external-apps = true' line has been add (enabled) in Termux \$HOME/.termux/termux.properties."
   termux-reload-settings
 fi
@@ -90,6 +92,7 @@ if [ "$Android" -ge 6 ]; then
     # termux-open utility can send an Android Intent from Termux to Android system to open apk package file in pm.
     # other Android applications also can be Access Termux app data (files).
     sed -i '/allow-external-apps/s/# //' "$HOME/.termux/termux.properties"  # uncomment 'allow-external-apps = true' line
+    isOverwriteTermuxProp=1
     echo -e "$notice 'allow-external-apps = true' line has been uncommented (enabled) in Termux \$HOME/.termux/termux.properties."
     if [ "$Android" -eq 7 ] || [ "$Android" -eq 6 ]; then
       termux-reload-settings  # reload (restart) Termux settings required for Android 6 after enabled allow-external-apps, also required for Android 7 due to 'Package installer has stopped' err
@@ -183,7 +186,7 @@ while true; do
   Referer=$(echo "$dlUrl" | awk -F/ '{print $1"//"$3"/"}')  # extract base domain from dlUrl
   http_status=$(curl -sL --head --silent --fail --doh-url "$cfDOH" -A "$UA" -H "Referer: $Referer" "$dlUrl" 2>/dev/null)  # Check HTTP status code
   if [[ "$dlUrl" =~ ^[Qq] ]]; then
-    clear && exit 0
+    if [ $isOverwriteTermuxProp -eq 1 ]; then sed -i '/allow-external-apps/s/^/# /' "$HOME/.termux/termux.properties";fi && clear && exit 0
   elif [ "$http_status" != "404" ] || [ "$http_status" == "302" ] || [ "$http_status" == "200" ] || [ "$http_status" == "403" ]; then
     echo && break
   else
@@ -329,11 +332,10 @@ while true; do
       else
         termux-open --send "$output_path"  # open & share dl file
       fi
-      break
+      if [ $isOverwriteTermuxProp -eq 1 ]; then sed -i '/allow-external-apps/s/^/# /' "$HOME/.termux/termux.properties";fi && break
       ;;
     n*|N*)
       echo -e "$notice Download cancel by user!"
-      break  # break the while loop
       ;;
     *) echo -e "$info Invalid choice! Please select valid options." && sleep 3 ;;
   esac
