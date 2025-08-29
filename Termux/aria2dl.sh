@@ -198,13 +198,12 @@ getFileMetadata() {
         wait $aria2ProcessId 2>/dev/null  # Wait for it to terminate
         rm -rf "$HOME/$fileName"
         rm -rf "$HOME/${fileName}.aria2"
-        direct_url=$(grep -o 'URI=https://[^ ]*\.seedr\.cc/[^ ]*%[^ ]*' aria2dl_log.txt | head -1 | sed 's/URI=//')
-        dlUrl="$direct_url"
+        redirect_url=$(grep -o 'URI=https://[^ ]*\.seedr\.cc/[^ ]*%[^ ]*' aria2dl_log.txt | head -1 | sed 's/URI=//')
+        dlUrl="$redirect_url"
+        [ -z "$fileSize" ] && fileSize=$(awk '/\[#.*GiB\([0-9]*%\)/ {match($0, /[0-9.]+GiB/); print substr($0, RSTART, RLENGTH); exit}' aria2dl_log.txt)  # Extract file Size from aria2c progress-bar
         rm -f aria2dl_log.txt
-        encoded_fileName=$(echo "$direct_url" | sed 's/.*\///; s/?.*//')  # Extract everything after last / and before ?
+        encoded_fileName=$(echo "$redirect_url" | sed 's/.*\///; s/?.*//')  # Extract everything after last / and before ?
         decoded_fileName=$(echo "$encoded_fileName" | sed 's/%20/ /g')  # replace %20 with space
-        decoded_fileSize=$(echo "$encoded_fileName" | sed 's/%20/ /g' | awk -F' - ' '{print $NF}' | sed 's/\.[^.]*$//')  # Extract after last - and before .
-        [ -z "$fileSize" ] && fileSize="$decoded_fileSize"
         break
       fi
     done
