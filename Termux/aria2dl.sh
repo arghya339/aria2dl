@@ -285,6 +285,7 @@ prompt() {
     echo -e "[?] Do you want to download ${Red}$fileName${Reset} - $fileSize [Y/n]: \c" && read opt
     case $opt in
       y*|Y*|"")
+        getFileMetadata  # Call the get file metadata function
         dl  # Call the download function
         if [ "$file_ext" == "apk" ]; then
           echo -e "Do you want to install ${Red}$fileName${Reset} [Y/n]: \c" && read options
@@ -340,7 +341,6 @@ while true; do
       echo -e "$notice Given Url invalid! Please enter a valid Url." && sleep 3 && clear
     fi
   done
-  getFileMetadata  # Call the get file metadata function
   prompt  # Call the prompt function
   continue
 done
