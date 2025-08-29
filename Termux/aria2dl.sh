@@ -302,7 +302,8 @@ prompt() {
               #base_name="${fileName%.*}"
               #mkdir -p "$dl_dir/$base_name"
               pv "$output_path" | bsdtar -xf - -C "$dl_dir/"
-              rm -f "$dl_dir/$base_name"
+              rm -rf "$output_path"  # remove zip file
+              #rm -f "$dl_dir/$base_name"
               ;;
             n*|N*) echo -e "$notice ${Red}$fileName${Reset} archive extracting skiped by user!" ;;
             *) echo -e "$info Invalid choice! archive extracting skiped!"
