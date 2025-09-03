@@ -290,7 +290,7 @@ if [ ! -f "$HOME/.shortcuts/aria2dl" ] || [ ! -f "$HOME/.termux/widget/dynamic_s
     # Download Termux:Widget app from GitHub
     tag=$(curl -s https://api.github.com/repos/termux/termux-widget/releases/latest | jq -r '.tag_name | sub("^v"; "")')
     fileName="termux-widget-app_v$tag+github.debug.apk"
-    dlUrl="https://api.github.com/repos/termux/termux-widget/releases/v$tag/download/$fileName"
+    dlUrl="https://github.com/termux/termux-widget/releases/download/v$tag/$fileName"
     output_path="$dl_dir/$fileName"
     while true; do
       curl -L --progress-bar -C - -o "$output_path" "$dlUrl"
