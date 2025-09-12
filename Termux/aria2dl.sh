@@ -261,15 +261,15 @@ apkInstall() {
     # Temporary Disable SELinux Enforcing during installation if it not in Permissive
     if [ "$(su -c 'getenforce 2>/dev/null')" = "Enforcing" ]; then
       su -c "setenforce 0"  # set SELinux to Permissive mode to unblock unauthorized operations
-      su -c "pm install -i com.android.vending '/data/local/tmp/$fileName'"
+      su -c "pm install -r -i com.android.vending '/data/local/tmp/$fileName'"
       su -c "setenforce 1"  # set SELinux to Enforcing mode to block unauthorized operations
      else
-      su -c "pm install -i com.android.vending '/data/local/tmp/$fileName'"
+      su -c "pm install -r -i com.android.vending '/data/local/tmp/$fileName'"
     fi
     su -c "rm -f '/data/local/tmp/$fileName'"
   elif "$HOME/rish" -c "id" >/dev/null 2>&1; then
     ~/rish -c "cp '$output_path' '/data/local/tmp/$fileName'"
-    ./rish -c "pm install -r -i com.android.vending '/data/local/tmp/$fileName'" > /dev/null 2>&1  # -r=reinstall --force-uplow=downgrade
+    ./rish -c "pm install -r -i com.android.vending '/data/local/tmp/$fileName'" > /dev/null 2>&1  # -r=reinstall
     $HOME/rish -c "rm -f '/data/local/tmp/$fileName'"
   elif [ $Android -le 6 ]; then
     am start -a android.intent.action.VIEW -t application/vnd.android.package-archive -d "file://${output_path}"
