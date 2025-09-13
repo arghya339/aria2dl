@@ -114,6 +114,7 @@ UA="Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Ch
 cfIP="1.1.1.1,1.0.0.1"  # cloudflare pub-dns IP Address
 cfDOH="https://cloudflare-dns.com/dns-query"  # cloudflare pub dns-over-https address
 dl_dir="/sdcard/Download"  # Download dir
+pkg update > /dev/null 2>&1  # It downloads latest package list with versions from Termux remote repository, then compares them to local (installed) pkg versions, and shows a list of what can be upgraded if they are different.
 outdatedPKG=$(apt list --upgradable 2>/dev/null)  # get list of Termux outdated pkg
 installedPKG=$(pkg list-installed 2>/dev/null)  # get list of Termux installed pkg
 mkdir -p "$dl_dir"  # create $dl_dir if it doesn't exist
