@@ -109,7 +109,8 @@ fi
 clear && echo -e "🚀 ${Yellow}Please wait! starting aria2dl...${Reset}"
 
 # --- Global Variables ---
-UA="Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Mobile Safari/537.36"  # HTML User Agent
+milestone=$(curl -sL "https://chromiumdash.appspot.com/fetch_releases?channel=Stable&platform=Android&num=1" | jq -r '.[0].milestone') || milestone=140; milestone=${milestone:-"140"}
+UA="Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${milestone}.0.0.0 Mobile Safari/537.36"  # HTML User Agent
 cfIP="1.1.1.1,1.0.0.1"  # cloudflare pub-dns IP Address
 cfDOH="https://cloudflare-dns.com/dns-query"  # cloudflare pub dns-over-https address
 dl_dir="/sdcard/Download"  # Download dir
