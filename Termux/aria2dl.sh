@@ -180,6 +180,10 @@ if ! "$HOME/rish" -c "id" >/dev/null 2>&1 && [ -f "$HOME/rish_shizuku.dex" ]; th
   fi
 fi
 
+if [ "$(getprop ro.product.manufacturer)" == "Genymobile" ] && [ ! -f "$HOME/adb" ]; then
+  curl -sL -o "$HOME/adb" "https://raw.githubusercontent.com/rendiix/termux-adb-fastboot/refs/heads/master/binary/$(getprop ro.product.cpu.abi)/bin/adb" && chmod +x ~/adb
+fi
+
 # --- Get File Metadata ----
 getFileMetadata() {
   Referer=$(echo "$dlUrl" | awk -F/ '{print $1"//"$3"/"}')  # extract base domain from dlUrl
@@ -273,6 +277,9 @@ apkInstall() {
     ~/rish -c "cp '$output_path' '/data/local/tmp/$fileName'"
     ./rish -c "pm install -r -i com.android.vending '/data/local/tmp/$fileName'" > /dev/null 2>&1  # -r=reinstall
     $HOME/rish -c "rm -f '/data/local/tmp/$fileName'"
+  elif "$HOME/adb" shell "id" >/dev/null 2>&1; then
+    ~/adb shell pm install -r -i com.android.vending "$output_path" > /dev/null 2>&1
+    #~/adb shell cmd package install -r -i com.android.vending "$output_path" > /dev/null 2>&1
   elif [ $Android -le 6 ]; then
     am start -a android.intent.action.VIEW -t application/vnd.android.package-archive -d "file://${output_path}"
   else
