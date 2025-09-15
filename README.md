@@ -18,9 +18,13 @@ aria2 downloader
 
 ## Usage
 ### Android
-  - Open [Termux](https://github.com/termux/termux-app/releases/) and run the script with the following command:
+  - Open [Termux](https://github.com/termux/termux-app/releases/) and type following command then press `Enter` key twice:
   ```sh
-  curl --progress-bar -o "$HOME/.aria2dl.sh" https://raw.githubusercontent.com/arghya339/aria2dl/main/Termux/aria2dl.sh && bash "$HOME/.aria2dl.sh"
+  pkg update && pkg reinstall apt bash -y
+  ```
+  run the script with the following command:
+  ```sh
+  curl --progress-bar -o "$HOME/.aria2dl.sh" "https://raw.githubusercontent.com/arghya339/aria2dl/main/Termux/aria2dl.sh" && bash "$HOME/.aria2dl.sh"
   ```
   Run aria2dl with these commands in Termux:
   ```
