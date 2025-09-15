@@ -20,7 +20,7 @@ aria2 downloader
 ### Android
   - Open [Termux](https://github.com/termux/termux-app/releases/) and type following command then press `Enter` key twice:
   ```sh
-  pkg update && pkg reinstall apt bash -y
+  pkg update && pkg install --only-upgrade apt bash -y
   ```
   run the script with the following command:
   ```sh
