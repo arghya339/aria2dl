@@ -116,6 +116,7 @@ cfDOH="https://cloudflare-dns.com/dns-query"  # cloudflare pub dns-over-https ad
 dl_dir="/sdcard/Download"  # Download dir
 pkg update > /dev/null 2>&1  # It downloads latest package list with versions from Termux remote repository, then compares them to local (installed) pkg versions, and shows a list of what can be upgraded if they are different.
 outdatedPKG=$(apt list --upgradable 2>/dev/null)  # get list of Termux outdated pkg
+echo "$outdatedPKG" | grep -q "dpkg was interrupted" 2>/dev/null && { yes "N" | dpkg --configure -a; outdatedPKG=$(apt list --upgradable 2>/dev/null); }
 installedPKG=$(pkg list-installed 2>/dev/null)  # get list of Termux installed pkg
 mkdir -p "$dl_dir"  # create $dl_dir if it doesn't exist
 apMode=$(getprop persist.radio.airplane_mode_on)  # Get AirPlane Mode Status (0=OFF; 1=ON)
@@ -131,7 +132,8 @@ pkgUpdate() {
   local pkg=$1
   if echo "$outdatedPKG" | grep -q "^$pkg/" 2>/dev/null; then
     echo -e "$running Upgrading $pkg pkg.."
-    pkg install --only-upgrade "$pkg" -y > /dev/null 2>&1
+    output=$(pkg install --only-upgrade "$pkg" -y 2>/dev/null)
+    echo "$output" | grep -q "dpkg was interrupted" 2>/dev/null && { yes "N" | dpkg --configure -a; yes "N" | pkg install --only-upgrade "$pkg" -y > /dev/null 2>&1; }
   fi
 }
 
@@ -147,17 +149,22 @@ pkgInstall() {
 }
 
 pkgInstall "dpkg"  # dpkg update
+pkgInstall "libgnutls"  # pm apt & dpkg use it to securely download packages from repositories over HTTPS
+pkgInstall "coreutils"  # It provides basic file, shell, & text manipulation utilities. such as: ls, cp, mv, rm, mkdir, cat, echo, etc.
 pkgInstall "termux-core"  # it's contains basic essential cli utilities, such as: ls, cp, mv, rm, mkdir, cat, echo, etc.
 pkgInstall "termux-tools"  # it's provide essential commands, sush as: termux-change-repo, termux-setup-storage, termux-open, termux-share, etc.
 pkgInstall "termux-keyring"  # it's use during pkg install/update to verify digital signature of the pkg and remote repository
 pkgInstall "termux-am"  # termux am (activity manager) update
 pkgInstall "termux-am-socket"  # termux am socket (when run: am start -n activity ,termux-am take & send to termux-am-stcket and it's send to Termux Core to execute am command) update
+pkgInstall "inetutils"  # ping utils is provided by inetutils
+pkgInstall "util-linux"  # it provides: kill, killall, uptime, uname, chsh, lscpu
 pkgInstall "grep"  # grep update
 pkgInstall "gawk"  # gnu awk update
 pkgInstall "sed"  # sed update
 pkgInstall "curl"  # curl update
 pkgInstall "libcurl"  # curl lib update
 pkgInstall "aria2"  # aria2 install/update
+pkgInstall "openssl"  # openssl install/update
 pkgInstall "bsdtar"  # bsdtar install/update
 pkgInstall "pv"  # pv install/update
 
@@ -286,9 +293,9 @@ apkInstall() {
     ~/rish -c "cp '$output_path' '/data/local/tmp/$fileName'"
     ./rish -c "pm install -r -i com.android.vending '/data/local/tmp/$fileName'" > /dev/null 2>&1  # -r=reinstall
     $HOME/rish -c "rm -f '/data/local/tmp/$fileName'"
-  elif "$HOME/adb" -s $(~/adb devices | grep "emulator-*" | awk '{print $1}') shell "id" >/dev/null 2>&1; then
-    ~/adb -s $(~/adb devices | grep "emulator-*" | cut -f1) shell pm install -r -i com.android.vending "$output_path" > /dev/null 2>&1
-    #~/adb -s $(~/adb devices | grep "emulator-*" | awk '{print $1}') shell cmd package install -r -i com.android.vending "$output_path" > /dev/null 2>&1
+  elif "$HOME/adb" -s $(~/adb devices | head -2 | tail -1 | awk '{print $1}') shell "id" >/dev/null 2>&1; then
+    ~/adb -s $(~/adb devices | head -2 | tail -1 | cut -f1) shell pm install -r -i com.android.vending "$output_path" > /dev/null 2>&1
+    #~/adb -s $(~/adb devices | head -2 | tail -1 | awk '{print $1}') shell cmd package install -r -i com.android.vending "$output_path" > /dev/null 2>&1
   elif [ $Android -le 6 ]; then
     am start -a android.intent.action.VIEW -t application/vnd.android.package-archive -d "file://${output_path}"
   else
