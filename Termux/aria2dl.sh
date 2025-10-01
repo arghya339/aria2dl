@@ -291,9 +291,9 @@ apkInstall() {
     ~/rish -c "cp '$output_path' '/data/local/tmp/$fileName'"
     ./rish -c "pm install -r -i com.android.vending '/data/local/tmp/$fileName'" > /dev/null 2>&1  # -r=reinstall
     $HOME/rish -c "rm -f '/data/local/tmp/$fileName'"
-  elif "$HOME/adb" -s $(~/adb devices | head -2 | tail -1 | awk '{print $1}') shell "id" >/dev/null 2>&1; then
-    ~/adb -s $(~/adb devices | head -2 | tail -1 | cut -f1) shell pm install -r -i com.android.vending "$output_path" > /dev/null 2>&1
-    #~/adb -s $(~/adb devices | head -2 | tail -1 | awk '{print $1}') shell cmd package install -r -i com.android.vending "$output_path" > /dev/null 2>&1
+  elif "$HOME/adb" -s $(~/adb devices 2>/dev/null | head -2 | tail -1 | awk '{print $1}') shell "id" >/dev/null 2>&1; then
+    ~/adb -s $(~/adb devices 2>/dev/null | head -2 | tail -1 | cut -f1) shell pm install -r -i com.android.vending "$output_path" > /dev/null 2>&1
+    #~/adb -s $(~/adb devices 2>/dev/null | head -2 | tail -1 | awk '{print $1}') shell cmd package install -r -i com.android.vending "$output_path" > /dev/null 2>&1
   elif [ $Android -le 6 ]; then
     am start -a android.intent.action.VIEW -t application/vnd.android.package-archive -d "file://${output_path}"
   else
