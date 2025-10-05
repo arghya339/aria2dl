@@ -240,7 +240,7 @@ aria2ConsoleLogHide() {
   clear  # clear aria2 multi error log from console
   print_aria2dl  # call the print_aria2dl function
   echo "Enter download Url: $dlUrl" && echo
-  echo "[?] Do you want to download ${Red}$fileName${Reset} - $fileSize [Y/n]: $opt"
+  echo -e "[?] Do you want to download ${Red}$fileName${Reset} - $fileSize [Y/n]: $opt"
 }
 
 # --- Download file using aria2 ---
