@@ -240,7 +240,7 @@ aria2ConsoleLogHide() {
   clear  # clear aria2 multi error log from console
   print_aria2dl  # call the print_aria2dl function
   echo "Enter download Url: $dlUrl" && echo
-  echo -e "[?] Do you want to download ${Red}$fileName${Reset} - $fileSize [Y/n]: $opt"
+  echo -e "Do you want to download ${Red}$fileName${Reset} - $fileSize ? ${whiteBG}➤ <Yes> $Reset   <No>"
 }
 
 # --- Download file using aria2 ---
@@ -353,25 +353,71 @@ if [ ! -f "$HOME/.shortcuts/aria2dl" ] || [ ! -f "$HOME/.termux/widget/dynamic_s
   am start -n com.termux.widget/com.termux.widget.TermuxCreateShortcutActivity > /dev/null 2>&1  # open Termux:Widget app shortcut create activity (screen/view) to add shortcut on Launcher Home
 fi
 
+# Y/n prompt function
+confirmPrompt() {
+  Prompt=${1}
+  Selected=${2:-0}  # :- set value as 0 if unset
+  maxLen=50
+  
+  # breaks long prompts into multiple lines (50 characters per line)
+  lines=()  # empty array
+  while [ -n "$Prompt" ]; do
+    lines+=("${Prompt:0:$maxLen}")  # take first 50 characters from $Prompt starting at index 0
+    Prompt="${Prompt:$maxLen}"  # removes first 50 characters from $Prompt by starting at 50 to 0
+  done
+  
+  # print all-lines except last-line
+  last_line_index=$(( ${#lines[@]} - 1 ))  # ${#lines[@]} = number of elements in lines array
+  for (( i=0; i<last_line_index; i++ )); do
+    echo -e "${lines[i]}"
+  done
+  last_line="${lines[$last_line_index]}"
+  
+  echo -ne '\033[?25l'  # Hide cursor
+  while true; do
+    show_prompt() {
+      echo -ne "\r\033[K"  # n=noNewLine r=returnCursorToStartOfLine \033[K=clearLine
+      echo -ne "$last_line "
+      [ $Selected -eq 0 ] && echo -ne "${whiteBG}➤ <Yes> $Reset   <No>" || echo -ne "  <Yes>  ${whiteBG}➤ <No> $Reset"  # highlight selected bt with white bg
+    }; show_prompt
+
+    read -rsn1 key
+    case $key in
+      $'\E')
+      # /bin/bash -c 'read -r -p "Type any ESC key: " input && printf "You Entered: %q\n" "$input"'  # q=safelyQuoted
+        read -rsn2 -t 0.1 key2  # -r=readRawInput -s=silent(noOutput) -t=timeout -n2=readTwoChar | waits upto 0.1s=100ms to read key 
+        case $key2 in 
+          '[C') Selected=1 ;;  # right arrow key
+          '[D') Selected=0 ;;  # left arrow key
+        esac
+        ;;
+      [Yy]*) Selected=0; show_prompt; break ;;
+      [Nn]*) Selected=1; show_prompt; break ;;
+      "") break ;;  # Enter key
+    esac
+  done
+  echo -e '\033[?25h' # Show cursor
+  return $Selected  # return Selected int index from this fun
+}
+
 # --- ask the user if they want to download ---
 prompt() {
   getFileMetadata  # Call the get file metadata function
   while true; do
-    echo -e "[?] Do you want to download ${Red}$fileName${Reset} - $fileSize [Y/n]: \c" && read opt
+    confirmPrompt "Do you want to download ${Red}$fileName${Reset} - $fileSize ?" && opt=Yes || opt=No
     case $opt in
       y*|Y*|"")
         dl  # Call the download function
         if [ "$file_ext" == "apk" ]; then
-          echo -e "Do you want to install ${Red}$fileName${Reset} [Y/n]: \c" && read options
+          confirmPrompt "Do you want to install ${Red}$fileName${Reset} ?" && options=Yes || options=No
           case $options in
             y*|Y*|"")
               apkInstall  # Call the apk Install function
               ;;
             n*|N*) echo -e "$notice ${Red}$fileName${Reset} installation skiped by user!" ;;
-            *) echo -e "$info Invalid choice! installation skiped!" ;;
           esac
         elif [ "$file_ext" == "zip" ]; then
-          echo -e "Do you want to extract archive ${Red}$fileName${Reset} [Y/n]: \c" && read options
+          confirmPrompt "Do you want to extract archive ${Red}$fileName${Reset} ?" && options=Yes || options=No
           case $options in
             y*|Y*|"")
               #base_name="${fileName%.*}"
@@ -383,7 +429,6 @@ prompt() {
               #rm -f "$dl_dir/$base_name"
               ;;
             n*|N*) echo -e "$notice ${Red}$fileName${Reset} archive extracting skiped by user!" ;;
-            *) echo -e "$info Invalid choice! archive extracting skiped!"
           esac
         elif [ "$file_ext" == "iso" ]; then
           am start -n "eu.depau.etchdroid/.ui.MainActivity" >/dev/null 2>&1
@@ -397,7 +442,6 @@ prompt() {
         echo -e "$notice Download cancel by user!"
         break  # break the while loop
         ;;
-      *) echo -e "$info Invalid choice! Please select valid options." && sleep 3 ;;
     esac
   done
 }
