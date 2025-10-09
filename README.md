@@ -17,7 +17,7 @@ aria2 downloader
 - Android device with working internet connection.
 
 ## Usage
-### Android
+### ![Android](https://img.shields.io/badge/Android-3DDC84?style=for-the-badge&logo=android&logoColor=white)
   - Open [Termux](https://github.com/termux/termux-app/releases/) and type following command then press `Enter` key twice:
   ```sh
   pkg update && pkg install --only-upgrade apt bash coreutils openssl -y
