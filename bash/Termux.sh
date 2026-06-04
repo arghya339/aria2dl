@@ -65,36 +65,38 @@ if [ $Android -ge 6 ]; then
 fi
 
 # --- Shizuku Setup first time ---
-if [ $su == false ] && { [ ! -f "$HOME/rish" ] || [ ! -f "$HOME/rish_shizuku.dex" ]; }; then
-  #echo -e "$info Please manually install Shizuku from Google Play Store." && sleep 1
-  #termux-open-url "https://play.google.com/store/apps/details?id=moe.shizuku.privileged.api"
-  echo -e "$info Please manually install Shizuku from GitHub." && sleep 1
-  termux-open-url "https://github.com/RikkaApps/Shizuku/releases/latest"
-  am start -n com.android.settings/.Settings\$MyDeviceInfoActivity > /dev/null 2>&1  # Open Device Info
-
-  curl -sL -o "$HOME/rish" "https://raw.githubusercontent.com/arghya339/crdl/refs/heads/main/Shizuku/rish" && chmod +x "$HOME/rish"
-  sleep 0.5 && curl -sL -o "$HOME/rish_shizuku.dex" "https://raw.githubusercontent.com/arghya339/crdl/refs/heads/main/Shizuku/rish_shizuku.dex"
-  
-  if [ "$Android" -lt 11 ]; then
-    url="https://youtu.be/ZxjelegpTLA"  # YouTube/@MrPalash360: Start Shizuku using Computer
-    activityClass="com.android.settings/.Settings\$DevelopmentSettingsDashboardActivity"  # Open Developer options
-  else
-    activityClass="com.android.settings/.Settings\$WirelessDebuggingActivity"  # Open Wireless Debugging Settings
-    url="https://youtu.be/YRd0FBfdntQ"  # YouTube/@MrPalash360: Start Shizuku Android 11+
+if [ $su == false ] && { [ ! -f "$PREFIX/bin/rish" ] || [ ! -f "$PREFIX/bin/rish_shizuku.dex" ]; }; then
+  curl -sL -o "$PREFIX/bin/rish" "https://raw.githubusercontent.com/arghya339/crdl/refs/heads/main/Shizuku/rish" && chmod +x "$PREFIX/bin/rish"
+  sleep 0.5 && curl -sL -o "$PREFIX/bin/rish_shizuku.dex" "https://raw.githubusercontent.com/arghya339/crdl/refs/heads/main/Shizuku/rish_shizuku.dex"
+  if ! am start -n "moe.shizuku.privileged.api/moe.shizuku.manager.legacy.ShellRequestHandlerActivity" &>/dev/null; then
+    #echo -e "$info Please manually install Shizuku from Google Play Store." && sleep 1
+    #termux-open-url "https://play.google.com/store/apps/details?id=moe.shizuku.privileged.api"
+    echo -e "$info Please manually install Shizuku from GitHub." && sleep 1
+    termux-open-url "https://github.com/RikkaApps/Shizuku/releases/latest"
   fi
-  echo -e "$info Please start Shizuku by following guide: $url" && sleep 1
-  am start -n "$activityClass" &>/dev/null
-  termux-open-url "$url"
+  if ! rish -c "id" &>/dev/null; then
+    am start -n com.android.settings/.Settings\$MyDeviceInfoActivity &>/dev/null  # Open Device Info
+    if [ $Android -lt 11 ]; then
+      url="https://youtu.be/ZxjelegpTLA"  # YouTube/@MrPalash360: Start Shizuku using Computer
+      activityClass="com.android.settings/.Settings\$DevelopmentSettingsDashboardActivity"  # Open Developer options
+    else
+      activityClass="com.android.settings/.Settings\$WirelessDebuggingActivity"  # Open Wireless Debugging Settings
+      url="https://youtu.be/YRd0FBfdntQ"  # YouTube/@MrPalash360: Start Shizuku Android 11+
+    fi
+    echo -e "$info Please start Shizuku by following guide: ${Blue}$url${Reset}" && sleep 1
+    am start -n "$activityClass" &>/dev/null
+    termux-open-url "$url"
+  fi
 fi
-if ! "$HOME/rish" -c "id" &>/dev/null && [ -f "$HOME/rish_shizuku.dex" ]; then
-  if ~/rish -c "id" 2>&1 | grep -q 'java.lang.UnsatisfiedLinkError'; then
-    rm -f "$HOME/rish_shizuku.dex" && curl -sL -o "$HOME/rish_shizuku.dex" "https://raw.githubusercontent.com/arghya339/crdl/refs/heads/main/Shizuku/Play/rish_shizuku.dex"
+if ! rish -c "id" &>/dev/null && [ -f "$PREFIX/bin/rish_shizuku.dex" ]; then
+  if rish -c "id" 2>&1 | grep -q 'java.lang.UnsatisfiedLinkError'; then
+    rm -f "$PREFIX/bin/rish_shizuku.dex" && curl -sL -o "$PREFIX/bin/rish_shizuku.dex" "https://raw.githubusercontent.com/arghya339/crdl/refs/heads/main/Shizuku/Play/rish_shizuku.dex"
   fi
 fi
 
 # Only for Genymotion (Android Emulator)
-if [ "$(getprop ro.product.manufacturer)" == "Genymobile" ] && [ ! -f "$HOME/adb" ]; then
-  curl -sL -o "$HOME/adb" "https://raw.githubusercontent.com/rendiix/termux-adb-fastboot/refs/heads/master/binary/$(getprop ro.product.cpu.abi)/bin/adb" && chmod +x ~/adb
+if [ "$(getprop ro.product.manufacturer)" == "Genymobile" ] && [ ! -f "$PREFIX/bin/adb" ]; then
+  curl -sL -o "$PREFIX/bin/adb" "https://raw.githubusercontent.com/rendiix/termux-adb-fastboot/refs/heads/master/binary/$(getprop ro.product.cpu.abi)/bin/adb" && chmod +x $PREFIX/bin/adb
 fi
 
 pkgUpdate() {
@@ -161,23 +163,18 @@ apkInstall() {
   fileName=$(basename $filePath)
   if [ $su == true ]; then
     su -c "cp '$filePath' '/data/local/tmp/$fileName'"
-    # Temporary Disable SELinux Enforcing during installation if it not in Permissive
-    if [ "$(su -c 'getenforce 2>/dev/null')" = "Enforcing" ]; then
-      su -c "setenforce 0"  # set SELinux to Permissive mode to unblock unauthorized operations
-      su -c "pm install -r -i com.android.vending '/data/local/tmp/$fileName'"
-      su -c "setenforce 1"  # set SELinux to Enforcing mode to block unauthorized operations
-     else
-      su -c "pm install -r -i com.android.vending '/data/local/tmp/$fileName'"
-    fi
+    [ "$(su -c 'getenforce 2>/dev/null')" = "Enforcing" ] && { su -c "setenforce 0"; writeSELinux=true; } || writeSELinux=false
+    su -c "pm install -r -i com.android.vending '/data/local/tmp/$fileName'"
+    [ $writeSELinux == true ] && su -c "setenforce 1"
     su -c "rm -f '/data/local/tmp/$fileName'"
-  elif "$HOME/rish" -c "id" >/dev/null 2>&1; then
-    ~/rish -c "cp '$filePath' '/data/local/tmp/$fileName'"
-    ./rish -c "pm install -r -i com.android.vending '/data/local/tmp/$fileName'" > /dev/null 2>&1  # -r=reinstall
-    $HOME/rish -c "rm -f '/data/local/tmp/$fileName'"
-  elif "$HOME/adb" -s $(~/adb devices 2>/dev/null | grep "device$" | awk '{print $1}' | tail -1) shell "id" >/dev/null 2>&1; then
-    ~/adb -s $("$HOME/adb" devices 2>/dev/null | grep "device$" | awk '{print $1}' | tail -1) shell cp $filePath /data/local/tmp/$fileName
-    ~/adb -s $("$HOME/adb" devices 2>/dev/null | grep "device$" | awk '{print $1}' | tail -1) shell pm install -r -i com.android.vending "/data/local/tmp/$fileName" > /dev/null 2>&1
-    #~/adb -s $("$HOME/adb" devices 2>/dev/null | grep "device$" | awk '{print $1}' | tail -1) shell cmd package install -r -i com.android.vending "$output_path" > /dev/null 2>&1
+  elif rish -c "id" &>/dev/null; then
+    rish -c "cp '$filePath' '/data/local/tmp/$fileName'"
+    rish -c "pm install -r -i com.android.vending '/data/local/tmp/$fileName'" &>/dev/null
+    rish -c "rm -f '/data/local/tmp/$fileName'"
+  elif adb -s $(adb devices 2>/dev/null | grep "device$" | awk '{print $1}' | tail -1) shell "id" &>/dev/null; then
+    adb -s $(adb devices 2>/dev/null | grep "device$" | awk '{print $1}' | tail -1) shell cp $filePath /data/local/tmp/$fileName
+    adb -s $(adb devices 2>/dev/null | grep "device$" | awk '{print $1}' | tail -1) shell pm install -r -i com.android.vending "/data/local/tmp/$fileName" &>/dev/null
+    #adb -s $(adb devices 2>/dev/null | grep "device$" | awk '{print $1}' | tail -1) shell cmd package install -r -i com.android.vending "$output_path" &> /dev/null
   elif [ $Android -le 6 ]; then
     am start -a android.intent.action.VIEW -t application/vnd.android.package-archive -d "file://${filePath}"
   else
@@ -209,23 +206,17 @@ if [ ! -f "$HOME/.shortcuts/aria2dl" ] || [ ! -f "$HOME/.termux/widget/dynamic_s
     [ -f "$filePath" ] && rm -f "$filePath"  # if Termux:Widget app package exist then remove it 
   fi
   if [ $su == true ]; then
-    if [ "$(su -c 'getenforce 2>/dev/null')" = "Enforcing" ]; then
-      su -c "setenforce 0"  # set SELinux to Permissive mode to unblock unauthorized operations
-      su -c 'pm grant com.termux android.permission.POST_NOTIFICATIONS'
-      su -c "cmd deviceidle whitelist +com.termux"
-      su -c "cmd appops set com.termux SYSTEM_ALERT_WINDOW allow"
-      su -c "setenforce 1"  # set SELinux to Enforcing mode to block unauthorized operations
-    else
-      su -c 'pm grant com.termux android.permission.POST_NOTIFICATIONS'
-      su -c "cmd deviceidle whitelist +com.termux"
-      su -c "cmd appops set com.termux SYSTEM_ALERT_WINDOW allow"
-    fi
-  elif "$HOME/rish" -c "id" >/dev/null 2>&1; then
-    ~/rish -c 'pm grant com.termux android.permission.POST_NOTIFICATIONS'
-    ~/rish -c "cmd deviceidle whitelist +com.termux"
-    $HOME/rish -c "cmd appops set com.termux REQUEST_INSTALL_PACKAGES allow"
-    $HOME/rish -c "cmd appops set com.termux.widget REQUEST_INSTALL_PACKAGES allow"
-    $HOME/rish -c "cmd appops set com.termux SYSTEM_ALERT_WINDOW allow"
+    [ "$(su -c 'getenforce 2>/dev/null')" = "Enforcing" ] && { su -c "setenforce 0"; writeSELinux=true; } || writeSELinux=false
+    su -c 'pm grant com.termux android.permission.POST_NOTIFICATIONS'
+    su -c "cmd deviceidle whitelist +com.termux" &>/dev/null
+    su -c "cmd appops set com.termux SYSTEM_ALERT_WINDOW allow"
+    [ $writeSELinux == true ] && su -c "setenforce 1"
+  elif rish -c "id" &>/dev/null; then
+    rish -c 'pm grant com.termux android.permission.POST_NOTIFICATIONS'
+    rish -c "cmd deviceidle whitelist +com.termux" &>/dev/null
+    rish -c "cmd appops set com.termux REQUEST_INSTALL_PACKAGES allow"
+    rish -c "cmd appops set com.termux.widget REQUEST_INSTALL_PACKAGES allow"
+    rish -c "cmd appops set com.termux SYSTEM_ALERT_WINDOW allow"
   else
     echo -e "$info Please manually turn on: ${Green}Display over other apps → Termux → Allow display over other apps${Reset}" && sleep 6
     am start -a android.settings.action.MANAGE_OVERLAY_PERMISSION &> /dev/null  # open manage overlay permission settings

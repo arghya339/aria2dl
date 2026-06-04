@@ -29,15 +29,17 @@ checkInternet() {
   fi
 }
 
+isMacOS=false; isAndroid=false; isFedora=false
 if [[ "$(uname)" == "Darwin" ]]; then
-  isMacOS=true; isAndroid=false; isFedora=false
+  isMacOS=true; scripts=(macOS)
 elif [[ -d "/sdcard" ]] && [[ -d "/system" ]]; then
-  isAndroid=true; isMacOS=false; isFedora=false
+  isAndroid=true; scripts=(Termux)
 elif [[ -f "/etc/os-release" ]]; then
   if grep -qi "fedora" /etc/os-release 2>/dev/null; then
-    isFedora=true; isAndroid=false; isMacOS=false
+    isFedora=true; scripts=(Fedora)
   fi
 fi
+scripts+=(menu confirmPrompt)
 
 aria2dl="$HOME/.aria2dl"
 mkdir -p $aria2dl
@@ -48,11 +50,6 @@ eButtons=("<Select>" "<Exit>")
 bButtons=("<Select>" "<Back>")
 ynButtons=("<Yes>" "<No>")
 tfButtons=("<true>" "<false>")
-
-[ $isAndroid == true ] && scripts=(Termux)
-[ $isMacOS == true ] && scripts=(macOS)
-[ $isFedora == true ] && scripts=(Fedora)
-scripts+=(menu confirmPrompt)
 
 run() { for ((c=0; c<${#scripts[@]}; c++)); do source $aria2dl/${scripts[c]}.sh; done; }
 
@@ -124,7 +121,7 @@ print_aria2dl() {
   printf '\n'
 }
 
-checkInternet && milestone=$(curl -sL "https://chromiumdash.appspot.com/fetch_releases?channel=Stable&platform=Android&num=1" | jq -r '.[0].milestone') || milestone="146"
+checkInternet && milestone=$(curl -sL "https://chromiumdash.appspot.com/fetch_releases?channel=Stable&platform=Android&num=1" | jq -r '.[0].milestone') || milestone="149"
 UA="Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${milestone}.0.0.0 Mobile Safari/537.36"  # HTML User Agent
 cfIP="1.1.1.1,1.0.0.1"  # cloudflare pub-dns IP Address
 cfDoH="https://cloudflare-dns.com/dns-query"  # cloudflare pub dns-over-https address
@@ -197,7 +194,7 @@ prompt() {
     case $opt in
       Yes)
         dl  # Call the download function
-        if [ "$file_ext" == "apk" ]; then
+        if [ "$file_ext" == "apk" ] && [ $isAndroid == true ]; then
           confirmPrompt "Do you want to install ${Red}$fileName${Reset} ?" ynButtons && options=Yes || options=No
           case $options in
             Yes) apkInstall ;;  # Call the apk Install function
@@ -227,7 +224,13 @@ prompt() {
             gtk-launch balena-etcher || xdg-open "https://github.com/balena-io/etcher/releases"
           fi
         else
-          termux-open --send "$filePath"  # Open & share dl file
+          if [ $isAndroid == true ]; then
+            confirmPrompt "Do you want to share ${Red}$fileName${Reset}?" ynButtons && termux-open --send "$filePath" || termux-open "$filePath"
+          elif [ $isMacOS == true ]; then
+            open "$filePath"
+          else
+            xdg-open "$filePath"
+          fi
         fi
         sleep 3 && break
         ;;
