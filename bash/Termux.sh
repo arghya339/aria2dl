@@ -1,5 +1,7 @@
 #!/usr/bin/bash
 
+# Copyright (C) 2025, Arghyadeep Mondal <github.com/arghya339>
+
 if [ -f "$BingWallpaperJson" ]; then
   AutoUpdatesDependencies=$(jq -r '.AutoUpdatesDependencies' "$aria2Json" 2>/dev/null)
   AutoUpdatesTermux=$(jq -r '.AutoUpdatesTermux' "$aria2Json" 2>/dev/null)
@@ -153,6 +155,7 @@ dependencies() {
   pkgInstall "libcurl"  # curl lib update
   pkgInstall "openssl"  # openssl install/update
   pkgInstall "aria2"  # aria2 install/update
+  pkgInstall "jq"  # jq install/update
   pkgInstall "bsdtar"  # bsdtar install/update
   pkgInstall "pv"  # pv install/update
 }

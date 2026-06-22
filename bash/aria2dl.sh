@@ -43,7 +43,7 @@ scripts+=(menu confirmPrompt)
 
 aria2dl="$HOME/.aria2dl"
 mkdir -p $aria2dl
-aria2Json="$aria2dl/aria2.json"
+aria2Json="$aria2dl/aria2dl.json"
 [ $isAndroid == true ] && Download="/sdcard/Download" || Download="$HOME/Downloads"
 read rows cols < <(stty size)
 eButtons=("<Select>" "<Exit>")
@@ -120,6 +120,134 @@ print_aria2dl() {
   printf '%s\__,_/%s_/  %s/_/%s\__,_/%s____/%s\__,_/%s_/   %s\n' $FMT_RAINBOW $FMT_RESET
   printf '\n'
 }
+
+rm_aria2dl() {
+  if [ $isAndroid == true ]; then
+    [ -f "$PREFIX/bin/aria2dl" ] && rm -f $PREFIX/bin/aria2dl
+    [ -f "$HOME/.shortcuts/aria2dl" ] && rm -f ~/.shortcuts/aria2dl
+    [ -f "$HOME/.termux/widget/dynamic_shortcuts/aria2dl" ] && rm -f ~/.termux/widget/dynamic_shortcuts/aria2dl
+  elif [ $isMacOS == true ]; then
+    [ -f "/usr/local/bin/aria2dl" ] && rm -f /usr/local/bin/aria2dl
+  else
+    [ -f "/usr/local/bin/aria2dl" ] && sudo rm -f /usr/local/bin/aria2dl
+  fi
+  [ -d "$aria2dl" ] && rm -rf $aria2dl
+  [ -f $HOME/.aria2dl.sh ] && rm -f ~/.aria2dl.sh
+  #printf '\033[2J\033[3J\033[H'
+  echo -e "$good ${Yellow}aria2dl has been uninstalled successfully :(${Reset}"
+  echo -e "💔 ${Yellow}We're sorry to see you go. Feel free to reinstall anytime!${Reset}"
+  if [ $isAndroid == true ]; then termux-open "https://github.com/arghya339/aria2dl"; elif [ $isMacOS == true ]; then open "https://github.com/arghya339/aria2dl"; else xdg-open "https://github.com/arghya339/aria2dl" &>/dev/null; fi
+}
+
+if [ $isAndroid == true ]; then
+  ut="
+  -U -t, --update -t  Update only termux-app."
+  at="
+  -A -t, --auto -t    Config only termux-app auto update behaviour on script launch.
+                      Default: true"
+else
+  ut=; at=
+fi
+
+h_msg="Usage:	aria2dl [long option] [option] ...
+options:
+  -h, --help          Show this help message.
+  -V, --version       Print version information.
+  -U, --update        Update both script and dependencies.
+  -U -d, --update -d  Update only dependencies.
+  -U -s, --update -s  Update only script.$ut
+  -A, --auto          Config both dependencies and script auto update behaviour on script launch.
+                      Default: true
+  -A -d, --auto -d    Config only dependencies auto update behaviour on script launch.
+                      Default: true
+  -A -s, --auto -s    Config only script auto update behaviour on script launch.
+                      Default: true$at
+  -R, --remove        Remove this aria2dl script.
+  -R -f, --remove -f  Forcefully remove this aria2dl script.
+
+aria2dl home page: <https://github.com/arghya339/aria2dl>"
+print_err_msg() {
+  err_msg="aria2dl: $1: invalid option
+$h_msg"
+  echo "$err_msg"
+  return 1
+}
+if [ -n "$1" ]; then
+  case "$1" in
+    -h|--help) echo "aria2dl version $localVersion"; echo "$h_msg" ;;
+    -V|--version) aria2c --version | head -1; echo "aria2dl version $localVersion" ;;
+    -U|--update)
+      if [ -n "$2" ]; then
+        case "$2" in
+          -d) checkInternet && dependencies ;;
+          -s) checkInternet && updates ;;
+          -t) [ $isAndroid == true ] && { checkInternet && updateTermuxApp; } || { echo "This option unavailable on desktop."; echo "$h_msg"; } ;;
+          *) print_err_msg "$2" ;;
+        esac
+      else
+        checkInternet && dependencies && updates
+      fi
+      ;;
+    -A*|--auto*)
+      if [ -n "$2" ]; then
+        case "$2" in
+          -d*)
+            case "$2" in
+              -d=false) config AutoUpdatesDependencies false ;;
+              -d|-d=true) config AutoUpdatesDependencies true ;;
+              *) print_err_msg "$2" ;;
+            esac
+            ;;
+          -s*)
+            case "$2" in
+              -s=false) config AutoUpdatesScript false ;;
+              -s|-s=true) config AutoUpdatesScript true ;;
+              *) print_err_msg "$2" ;;
+            esac
+            ;;
+          -t*)
+            if [ $isAndroid == true ]; then
+              case "$2" in
+                -t=false) config AutoUpdatesTermux false ;;
+                -t|-t=true) config AutoUpdatesTermux true ;;
+                *) print_err_msg "$2" ;;
+              esac
+            else
+              echo "This option unavailable on desktop."; echo "$h_msg"
+            fi
+            ;;
+          *) print_err_msg "$2" ;;
+        esac
+      else
+        case "$1" in
+          -A=false|--auto=false) config AutoUpdatesScript false; config AutoUpdatesDependencies false ;;
+          -A|--auto|-A=true|--auto=true) config AutoUpdatesScript true; config AutoUpdatesDependencies true ;;
+          *) print_err_msg "$1" ;;
+        esac
+      fi
+      ;;
+    -R*|--remove*)
+      if [ -n "$2" ]; then
+        case "$2" in
+          -f) rm_aria2dl ;;
+          *) print_err_msg "$2" ;;
+        esac
+      else
+        confirmPrompt "Are you sure you want to uninstall aria2dl?" "ynButtons" "1" && response=Yes || response=No
+        case "$response" in
+          Yes)
+            echo -ne "${Red}Type 'yes' in capital to continue: ${Reset}" && read -r userInput
+            case "$userInput" in
+              YES) rm_aria2dl ;;
+            esac
+            ;;
+        esac
+      fi
+      ;;
+    *) print_err_msg "$1" ;;
+  esac
+  exit
+fi
 
 checkInternet && milestone=$(curl -sL "https://chromiumdash.appspot.com/fetch_releases?channel=Stable&platform=Android&num=1" | jq -r '.[0].milestone') || milestone="149"
 UA="Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${milestone}.0.0.0 Mobile Safari/537.36"  # HTML User Agent
