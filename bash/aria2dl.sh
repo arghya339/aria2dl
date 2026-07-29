@@ -256,37 +256,33 @@ cfDoH="https://cloudflare-dns.com/dns-query"  # cloudflare pub dns-over-https ad
 
 # --- Get File Metadata ----
 getFileMetadata() {
-  Referer=$(awk -F/ '{print $1"//"$3"/"}' <<< "$dlURL")  # Extract base domain from dlURL
-  fileName=$(curl -sIL --doh-url "$cfDoH" -A "$UA" -H "Referer: $Referer" "$dlURL" | grep -i '^location:\|content-disposition' | sed -n 's/.*filename=//p' | tail -1 | tr -d '\r"' | sed 's/.*\///')  # Get fileName from dlURL using curl
-  fileSize=$(curl -sIL $dlURL 2>/dev/null | grep -i Content-Length | tail -n 1 | awk '{ printf "Content Size: %.2f MB\n", $2 / 1024 / 1024 }' 2>/dev/null)  # dl fileSize
+  fileName=$(grep -i '^location:\|content-disposition' <<< "$httpStatus" | sed -n 's/.*filename=//p' | tail -1 | tr -d '\r"' | sed 's/.*\///')  # Get fileName from dlURL using curl
+  fileSize=$(grep -i Content-Length <<< "$httpStatus" | tail -n 1 | awk '{ printf "Content Size: %.2f MB\n", $2 / 1024 / 1024 }' 2>/dev/null)  # dl fileSize
   if [ -z "$fileName" ]; then
-    fileName=$(awk -F'/' '{print $6}' <<< "$dlURL" | sed 's/%20/ /g; s/?.*//')  # seedr.cc dlURL pattern
-  fi
-  # If File Has an Extension Extract it
-  if [[ "$dlURL" == *"archive"* ]]; then
+    fileName=$(basename "$dlURL" 2>/dev/null | cut -d'?' -f1 | sed 's/%20/ /g')
     while true; do
-      > aria2dl_log.txt  # Clear previous log
-      aria2c -x 16 -s 16 --continue=true --console-log-level=error --download-result=hide --summary-interval=0 -d "$HOME" -o "$fileName" -U "User-Agent: $UA" -U "Referer: $referUrl" --async-dns=true --async-dns-server="$cfIP" "$dlUrl" >> aria2dl_log.txt 2>&1 &
+      > $aria2dl/aria2dl_log.txt  # Clear previous log
+      aria2c -x 16 -s 16 --continue=true --console-log-level=error --download-result=hide --summary-interval=0 -d "$aria2dl" -o "$fileName" -U "User-Agent: $UA" -U "Referer: $Referer" --async-dns=true --async-dns-server="$cfIP" "$dlURL" >> $aria2dl/aria2dl_log.txt 2>&1 &
       aria2ProcessId=$!
       sleep 3  # Wait a moment for the log file to start being written
-      if grep -q "[0-9]*%" aria2dl_log.txt; then
+      if grep -q "[0-9]*%" $aria2dl/aria2dl_log.txt; then
         kill $aria2ProcessId 2>/dev/null  # Stop aria2c process
         wait $aria2ProcessId 2>/dev/null  # Wait for it to terminate
-        rm -f "$HOME/$fileName" "$HOME/${fileName}.aria2"
-        redirectURL=$(grep -o 'URI=https://[^ ]*\.seedr\.cc/[^ ]*%[^ ]*' aria2dl_log.txt | head -1 | sed 's/URI=//')
+        rm -f "$aria2dl/$fileName"
+        rm -f "$aria2dl/${fileName}.aria2"
+        redirectURL=$(grep -o 'URI=http[^ ]*' $aria2dl/aria2dl_log.txt | head -1 | sed 's/URI=//')
         dlURL="$redirectURL"
-        [ -z "$fileSize" ] && fileSize=$(awk '/\[#.*GiB\([0-9]*%\)/ {match($0, /[0-9.]+GiB/); print substr($0, RSTART, RLENGTH); exit}' aria2dl_log.txt)  # Extract fileSize from aria2c progress-bar
-        rm -f aria2dl_log.txt
-        encodedFileName=$(echo "$redirectURL" | sed 's/.*\///; s/?.*//')  # Extract everything after last / and before ?
-        decodedFileName=$(echo "$encodedFileName" | sed 's/%20/ /g')  # replace %20 with space
+        extractedSize=$(awk -F'/' '/\[#.*%/ {match($2, /[0-9.]+[A-Za-z]+iB/); print substr($2, RSTART, RLENGTH); exit}' $aria2dl/aria2dl_log.txt)  # Extract fileSize from aria2c progress-bar
+        fileSize="$extractedSize"
+        rm -f $aria2dl/aria2dl_log.txt
+        encodedFileName=$(sed 's/.*\///; s/?.*//' <<< "$redirectURL")  # Extract everything after last / and before ?
+        decodedFileName=$(sed 's/%20/ /g' <<< "$encodedFileName")  # Replace %20 with space
         break
       fi
     done
     fileName="$decodedFileName"
-    file_ext="zip"
-  elif [[ "$fileName" == *.* ]]; then
-    file_ext="${fileName##*.}"
   fi
+  [[ "$fileName" == *.* ]] && file_ext="${fileName##*.}"
   filePath="$Download/$fileName"  # save location of downloaded file
 }
 
@@ -302,7 +298,7 @@ aria2ConsoleLogHide() {
 dl() {
   while true; do
     echo -e "$running Downloading ${Red}$fileName${Reset} from ${Blue}$dlURL${Reset} using aria2.."
-    aria2c -x 16 -s 16 --continue=true --console-log-level=error --download-result=hide --summary-interval=0 -d "$Download" -o "$fileName" -U "User-Agent: $UA" -U "Referer: $referURL" --async-dns=true --async-dns-server="$cfIP" "$dlURL"
+    aria2c -x 16 -s 16 --continue=true --console-log-level=error --download-result=hide --summary-interval=0 -d "$Download" -o "$fileName" -U "User-Agent: $UA" -U "Referer: $Referer" --async-dns=true --async-dns-server="$cfIP" "$dlURL"
     if [ $? -eq 0 ]; then
       echo  # Space after aria2 progress-bar
       echo -e "$good Download complete with aria2c. Download file save to ${Cyan}$filePath${Reset}"
@@ -334,9 +330,9 @@ prompt() {
             Yes)
               #baseName="${fileName%.*}"
               #mkdir -p "$Download/$baseName"
-              termux-wake-lock
+              [ $isAndroid == true ] && termux-wake-lock
               pv "$filePath" | bsdtar -xf - -C "$Download/"
-              termux-wake-unlock
+              [ $isAndroid == true ] && termux-wake-unlock
               rm -f "$filePath"  # remove zip file
               #rm -f "$Download/$baseName"
               ;;
@@ -373,20 +369,38 @@ prompt() {
 # --- Prompt user to enter download URL ---
 while true; do
   printf '\033[2J\033[3J\033[H'
-  print_aria2dl  # Call the print aria2dl shape function
+  print_aria2dl
   read -p "Enter download URL: " dlURL
   Referer=$(awk -F/ '{print $1"//"$3"/"}' <<< "$dlURL")  # extract base domain from dlURL
-  httpStatus=$(curl -sL --head --silent --fail --doh-url "$cfDoH" -A "$UA" -H "Referer: $Referer" "$dlURL" 2>/dev/null)  # Check HTTP status code
+  redirectURL=$(curl -sIL --doh-url "$cfDoH" -A "$UA" -H "Referer: $Referer" "$dlURL" | grep -i "location:" | head -1 | sed 's/location: //i' | tr -d '\r')  # 301/302 - Redirect
+  [ -z "$redirectURL" ] && redirectURL="$dlURL"
+  httpStatus=$(curl -sIL --doh-url "$cfDoH" -A "$UA" -H "Referer: $Referer" "$redirectURL" 2>/dev/null)  # Check HTTP Status
+  httpStatusCode=$(head -1 <<< "$httpStatus" | awk '{print $2}')  # Extract Number from HTTP Status
   while true; do
     if [[ "$dlURL" =~ ^[Qq] ]]; then
       if [ $isOverwriteTermuxProp -eq 1 ]; then sed -i '/allow-external-apps/s/^/# /' "$HOME/.termux/termux.properties";fi && printf '\033[2J\033[3J\033[H' && exit 0
-    elif [ $httpStatus -ne 404 ] || [ $httpStatus -eq 302 ] || [ $httpStatus -eq 200 ] || [ $httpStatus -eq 403 ]; then
-      echo && break
+    elif [ $httpStatusCode -eq 200 ]; then  # OK
+      dlURL="$redirectURL" && prompt && break
+    elif [ $httpStatusCode -ne 200 ]; then
+      if [ $httpStatusCode -eq 400 ]; then
+        echo -e "$bad HTTP Status: 400 - Bad Request"
+      elif [ $httpStatusCode -eq 401 ]; then
+        echo -e "$bad HTTP Status: 401 - Unauthorized"
+      elif [ $httpStatusCode -eq 403 ]; then
+        echo -e "$bad HTTP Status: 403 - Forbidden"
+      elif [ $httpStatusCode -eq 404 ]; then
+        echo -e "$bad HTTP Status: 404 - Not Found"
+      elif [ $httpStatusCode -eq 500 ]; then
+        echo -e "$bad HTTP Status: 500 - Internal Server Error"
+      elif [ $httpStatusCode -eq 502 ]; then
+        echo -e "$bad HTTP Status: 502 - Bad Gateway"
+      elif [ $httpStatusCode -eq 503 ]; then
+        echo -e "$bad HTTP Status: 503 - Service Unavailable"
+      fi
+      sleep 3 && break
     else
-      echo -e "$notice Given URL invalid! Please enter a valid URL." && sleep 3 && printf '\033[2J\033[3J\033[H'
+      echo -e "$notice Given URL invalid! Please enter a valid URL." && sleep 3 && printf '\033[2J\033[3J\033[H' && break
     fi
   done
-  prompt  # Call the prompt function
-  continue
 done
 #####################################################################################################################################################################
